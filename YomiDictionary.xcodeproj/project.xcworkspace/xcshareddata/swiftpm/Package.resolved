@@ -1,0 +1,24 @@
+{
+  "originHash" : "e5c78d49c36e3028cce06270bc98658b3f8e142ea7ad2f7e9ebe61c6a1b57675",
+  "pins" : [
+    {
+      "identity" : "json-stream",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Topolyte/json-stream.git",
+      "state" : {
+        "revision" : "703a39ce871e97c4c3831ad8f681d26f4d884559",
+        "version" : "1.0.3"
+      }
+    },
+    {
+      "identity" : "zipfoundation",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
+      "state" : {
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
+      }
+    }
+  ],
+  "version" : 3
+}
