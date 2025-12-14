@@ -9,13 +9,14 @@ import Foundation
 
 enum DictionaryErrors: LocalizedError {
     case basicError
+    case dictionaryAlreadyImported
 }
 
 extension DictionaryErrors {
     var errorDescription: String? {
         switch self {
-        case .basicError:
-            return "Something went wrong."
+        case .basicError: "Something went wrong."
+        case .dictionaryAlreadyImported: "This dictionary is already imported."
         }
     }
 }

@@ -11,8 +11,16 @@ import ZIPFoundation
 @Observable
 final class SettingsViewModel {
     var isFilePickerPresented: Bool = false
+    var isInitImport: Bool = false
     var dictionaries: [YomiDictionary] = []
-    var importProgress: Double? = nil
+    var importProgress: Double? = nil {
+        didSet { isInitImport = false }
+    }
+    var importControlsDisabled: Bool {
+        importProgress != nil || isInitImport
+    }
+    
+    var isAlertPresented: Bool = false
     
     init() {
     }
@@ -35,13 +43,25 @@ final class SettingsViewModel {
         
         guard case .success(let fileUrl) = result else { return }
         
+        isInitImport = true
+        
         Task {
-            let dictionaryManager = await DictionaryManager()
-            try await dictionaryManager.saveDictionary(fileUrl) { [weak self] progressPercent in
-                self?.importProgress = progressPercent
-            } completion: { [weak self] in
-                self?.importProgress = nil
-                self?.loadDictionaryList()
+            do {
+                let dictionaryManager = await DictionaryManager()
+                try await dictionaryManager.saveDictionary(fileUrl) { [weak self] progressPercent in
+                    withAnimation {
+                        self?.importProgress = progressPercent
+                    }
+                } completion: { [weak self] in
+                    withAnimation {
+                        self?.importProgress = nil
+                        self?.loadDictionaryList()
+                    }
+                }
+            } catch {
+                isInitImport = false
+                importProgress = nil
+                isAlertPresented = true
             }
         }
 

@@ -50,9 +50,6 @@ extension DictionaryManager {
             }
             await completion()
     }
-    
-    
-    
 
 }
 
@@ -66,42 +63,51 @@ extension DictionaryManager {
                                                                                  
         return AsyncThrowingStream<DictionaryProgress, Error> { continuation in
             Task.detached { [self] in
-                
-                // Extracting dictionary zip file to cache
-                let fileManager = FileManager()
-                
-                var files = try fileManager.contentsOfDirectory(at: dictionaryFolder,
-                                                                        includingPropertiesForKeys: nil)
-                // Getting index.json id in files
-                let indexFileIdx = files.firstIndex { $0.lastPathComponent.contains("index.json") }
-                guard let indexFileIdx else { throw DictionaryErrors.basicError }
-                
-                // Processing index.json
-                let currentDictionary = try await processDictionaryMeta(files[indexFileIdx])
-                files.remove(at: indexFileIdx)
-
-                let countOfWords = try await countWords(in: files)
-                
-                // Saving count of words in database to dictionary
-                try await updateDictionary(currentDictionary.id, with: countOfWords)
-
-                let progress = DictionaryProgress(allWordsCount: countOfWords)
-                
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    files.forEach { url in
-                        group.addTask(priority: .low) { [self] in
-                            try await saveDictionaryPart(from: url, in: currentDictionary) {
-                                let result = await progress.incrementSavedWords($0)
-                                continuation.yield(result)
+                do {
+                    // Extracting dictionary zip file to cache
+                    let fileManager = FileManager()
+                    
+                    var files = try fileManager.contentsOfDirectory(at: dictionaryFolder,
+                                                                    includingPropertiesForKeys: nil)
+                    // Getting index.json id in files
+                    let indexFileIdx = files.firstIndex { $0.lastPathComponent.contains("index.json") }
+                    guard let indexFileIdx else { throw DictionaryErrors.basicError }
+                    
+                    // Processing index.json
+                    let currentDictionary = try await processDictionaryMeta(files[indexFileIdx])
+                    
+                    files.remove(at: indexFileIdx)
+                    
+                    let countOfWords = try await countWords(in: files)
+                    
+                    // Saving count of words in database to dictionary
+                    try await updateDictionary(currentDictionary.id, with: countOfWords)
+                    
+                    let progress = DictionaryProgress(allWordsCount: countOfWords)
+                    
+                    try await withThrowingTaskGroup(of: Void.self) { group in
+                        files.forEach { url in
+                            group.addTask(priority: .low) { [self] in
+                                try await saveDictionaryPart(from: url, in: currentDictionary) {
+                                    let result = await progress.incrementSavedWords($0)
+                                    continuation.yield(result)
+                                }
                             }
                         }
+                        
+                        for try await _ in group {}
+                        continuation.finish()
                     }
-                    
-                    for try await _ in group {}
-                    continuation.finish()
-                }
+                } catch { continuation.finish(throwing: error) }
             }
         }
+    }
+    private func checkIsDictionaryAlreadyImported(_ dictionary: SDYomiDictionary) async throws {
+        let rev = dictionary.revision
+        let title = dictionary.title
+        let predicate = #Predicate<SDYomiDictionary> { $0.title == title && $0.revision == rev }
+        let dictionaries = try await dataStore.fetchData(predicate: predicate)
+        if !dictionaries.isEmpty { throw DictionaryErrors.dictionaryAlreadyImported }
     }
 
     private func saveDictionaryPart(from file: URL,
@@ -242,6 +248,9 @@ extension DictionaryManager {
                                           revision: metaData.revision,
                                           dictDescription: metaData.description,
                                           wordsCount: 0)
+        
+        try await checkIsDictionaryAlreadyImported(dictionary)
+        
         print("Found dictionary: \(dictionary.title)")
         await dataStore.insert(dictionary)
         try await dataStore.save()

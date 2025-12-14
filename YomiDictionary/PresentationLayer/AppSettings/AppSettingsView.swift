@@ -22,7 +22,9 @@ struct AppSettingsView: View {
                             Button("Select") {
                                 viewModel.isFilePickerPresented = true
                             }
+                            if viewModel.isInitImport { ProgressView() }
                         }
+                        .disabled(viewModel.importControlsDisabled)
                         if viewModel.importProgress != nil {
                             VStack(alignment: .leading) {
                                 Text("Importing...")
@@ -47,6 +49,18 @@ struct AppSettingsView: View {
                 }
                 .listStyle(.insetGrouped)
             }
+            .alert(
+                "Import error",
+                isPresented: $viewModel.isAlertPresented,
+                actions: { Button("OK") {} },
+                message: { Text("Dictionary already exists. Please, try to import another one.") }
+            )
+            //            .alert(
+//                isPresented: $viewModel.isAlertPresented,
+//                error: viewModel.localizedError,
+//                actions: { _ in Text("OK") },
+//                message: { error in Text(error.localizedDescription) }
+//            )
             .onAppear { viewModel.didAppear() }
             .navigationBarTitle("Settings")
             .fileImporter(
