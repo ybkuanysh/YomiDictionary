@@ -8,8 +8,7 @@
 import Foundation
 import SwiftData
 
-@MainActor
-public final class ContainerManager {
+public final actor ContainerManager {
     public private(set) static var shared = ContainerManager()
     public private(set) var container: ModelContainer!
     
@@ -19,11 +18,5 @@ public final class ContainerManager {
         } catch {
             fatalError("Error initializing Core Data stack: \(error.localizedDescription)")
         }
-    }
-}
-
-public extension ModelContainer {
-    static func YomiWord() -> ModelContainer {
-        ContainerManager.shared.container
     }
 }

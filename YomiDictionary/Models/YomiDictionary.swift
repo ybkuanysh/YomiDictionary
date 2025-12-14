@@ -37,7 +37,7 @@ public class SDYomiDictionary: Identifiable, Hashable {
     }
 }
 
-public struct YomiDictionary: Identifiable {
+nonisolated public struct YomiDictionary: Identifiable {
     public var id: UUID = UUID()
     public var title: String
     public var revision: String?

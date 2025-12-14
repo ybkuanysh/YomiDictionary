@@ -8,56 +8,73 @@
 import Foundation
 import SwiftData
 import JsonStream
+import ZIPFoundation
 
-public actor DictionaryProgress {
-    public private(set) var wordsSaved: Int
-    public let allWordsCount: Int
-    public var percentage: Double {
-        Double(wordsSaved) / Double(allWordsCount)
-    }
-    
-    public init(wordsSaved: Int = 0, allWordsCount: Int = 0) {
-        self.wordsSaved = wordsSaved
-        self.allWordsCount = allWordsCount
-    }
-    public func incrementSavedWords(_ count: Int) -> Self {
-        wordsSaved += count
-        return self
-    }
-}
 
-public final class DictionaryManager {
-    
-    private let dataStore: YomiDictionariesDataSource
-    
-    init() {
-        dataStore = .init(container: .YomiWord())
+public final actor DictionaryManager {
+    private var dataStore: YomiDictionariesDataSource!
+
+    init() async {
+        dataStore = .init(container: await ContainerManager.shared.container)
     }
     
-    public func getDictionaries() async -> [YomiDictionary] {
-        let dictionaries = try? await dataStore.fetchData(predicate: #Predicate<SDYomiDictionary> {_ in true})
-        return dictionaries?.map(YomiDictionary.init) ?? []
-    }
 }
 
 // MARK: - Save Dictionary Words to Database
 
 extension DictionaryManager {
-    
-    public func saveDictionary(from zipURL: URL) throws -> AsyncThrowingStream<DictionaryProgress, Error> {
+    public func fetchDictionaries() async -> [YomiDictionary] {
+        let dictionaries = try? await dataStore.fetchData(predicate: #Predicate<SDYomiDictionary> {_ in true})
+        return dictionaries?.map(YomiDictionary.init) ?? []
+    }
 
-        // Extracting dictionary zip file to cache
-        let dictionaryFolder = try ZipExtractor.shared.extractToCache(zipURL: zipURL)
+    public func saveDictionary(_ fileUrl: URL,
+                               progress: @MainActor @escaping (Double) -> Void,
+                               completion: @MainActor @escaping () async -> Void) async throws -> Void {
         
+            guard fileUrl.startAccessingSecurityScopedResource() else {
+                throw DictionaryErrors.basicError
+            }
+            defer { fileUrl.stopAccessingSecurityScopedResource() }
+
+            let dictionaryURL = try await DictionaryManager.extractToCache(zipURL: fileUrl)
+            
+            let savingProgress = try dictionaryAsyncStream(from: dictionaryURL)
+            
+            var lastResult: Double = 0
+            for try await status in savingProgress {
+                let status = await status.percentage
+                if status == lastResult { continue }
+                lastResult = status
+                await progress(status)
+            }
+            await completion()
+    }
+    
+    
+    
+
+}
+
+
+// MARK: - Helpers
+
+extension DictionaryManager {
+    
+    private func dictionaryAsyncStream(from dictionaryFolder: URL) throws -> AsyncThrowingStream
+                                                                             <DictionaryProgress, Error> {
+                                                                                 
         return AsyncThrowingStream<DictionaryProgress, Error> { continuation in
             Task.detached { [self] in
-                var files = try FileManager.default.contentsOfDirectory(at: dictionaryFolder,
+                
+                // Extracting dictionary zip file to cache
+                let fileManager = FileManager()
+                
+                var files = try fileManager.contentsOfDirectory(at: dictionaryFolder,
                                                                         includingPropertiesForKeys: nil)
                 // Getting index.json id in files
                 let indexFileIdx = files.firstIndex { $0.lastPathComponent.contains("index.json") }
-                guard let indexFileIdx else { fatalError("Index file not found in the dictionary folder") }
-                
-                print("Index idx found")
+                guard let indexFileIdx else { throw DictionaryErrors.basicError }
                 
                 // Processing index.json
                 let currentDictionary = try await processDictionaryMeta(files[indexFileIdx])
@@ -72,8 +89,8 @@ extension DictionaryManager {
                 
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     files.forEach { url in
-                        group.addTask { [self] in
-                            try await saveDictionaryPartStream(from: url, in: currentDictionary) {
+                        group.addTask(priority: .low) { [self] in
+                            try await saveDictionaryPart(from: url, in: currentDictionary) {
                                 let result = await progress.incrementSavedWords($0)
                                 continuation.yield(result)
                             }
@@ -86,58 +103,10 @@ extension DictionaryManager {
             }
         }
     }
-    private func updateDictionary(_ id: UUID, with count: Int) async throws {
-        let dictionaries = try await dataStore.fetchData(
-            predicate: #Predicate<SDYomiDictionary> { $0.id == id }
-        )
-        if let dictionary = dictionaries.first {
-            dictionary.wordsCount = count
-            await dataStore.insert(dictionary)
-            try await dataStore.save()
-            return
-        } else { fatalError("Dictionary with id: \(id) not found") }
-    }
-    
-    private func countWords(in files: [URL]) async throws -> Int {
-        let total = try await withThrowingTaskGroup(of: Int.self) { group in
-            files.forEach { url in
-                group.addTask { [self] in try await countWords(in: url) }
-            }
-            
-            var totalCount: Int = 0
-            
-            for try await data in group {
-                totalCount += data
-            }
-            return totalCount
-        }
-        return total
-    }
-    
-    private func countWords(in file: URL) throws -> Int {
-        let jis = try JsonInputStream(filePath: file.path)
-        var counter: Int = 0
 
-        var arrayDepth: Int = 0
-        var isMainArray: Bool { arrayDepth == 1 }
-
-        while let token = try jis.read() {
-            switch token {
-            case .startArray: arrayDepth += 1
-            case .endArray:
-                arrayDepth -= 1
-                if isMainArray { counter += 1 }
-            default: continue
-            }
-        }
-        return counter
-    }
-
-    private func saveDictionaryPartStream(
-        from file: URL,
-        in dictionary: SDYomiDictionary?,
-        handler:  (Int) async -> Void
-    ) async throws {
+    private func saveDictionaryPart(from file: URL,
+                                    in dictionary: SDYomiDictionary?,
+                                    handler: (Int) async -> Void) async throws {
         var counter: Int = 0
 
         var arrayDepth: Int = 0
@@ -183,24 +152,89 @@ extension DictionaryManager {
                     dictionary: dictionary
                 )
                 await dataStore.insert(word)
+                await handler(1)
                 counter += 1
                 resetData()
             }
             if counter % 100 == 0 {
                 try await dataStore.save()
-                await handler(counter)
                 counter = 0
             }
         }
         try await dataStore.save()
-        await handler(counter)
     }
-}
 
+    private func updateDictionary(_ id: UUID, with count: Int) async throws {
+        let dictionaries = try await dataStore.fetchData(
+            predicate: #Predicate<SDYomiDictionary> { $0.id == id }
+        )
+        if let dictionary = dictionaries.first {
+            dictionary.wordsCount = count
+            await dataStore.insert(dictionary)
+            try await dataStore.save()
+            return
+        } else { fatalError("Dictionary with id: \(id) not found") }
+    }
 
-// MARK: - Helpers
+    private func countWords(in file: URL) throws -> Int {
+        let jis = try JsonInputStream(filePath: file.path)
+        var counter: Int = 0
 
-extension DictionaryManager {
+        var arrayDepth: Int = 0
+        var isMainArray: Bool { arrayDepth == 1 }
+
+        while let token = try jis.read() {
+            switch token {
+            case .startArray: arrayDepth += 1
+            case .endArray:
+                arrayDepth -= 1
+                if isMainArray { counter += 1 }
+            default: continue
+            }
+        }
+        return counter
+    }
+
+    private func countWords(in files: [URL]) async throws -> Int {
+        let total = try await withThrowingTaskGroup(of: Int.self) { group in
+            files.forEach { url in
+                group.addTask { [self] in try await countWords(in: url) }
+            }
+            
+            var totalCount: Int = 0
+            
+            for try await data in group {
+                totalCount += data
+            }
+            return totalCount
+        }
+        return total
+    }
+
+    /// Extract zip archive and return folder URL
+    @MainActor
+    private static func extractToCache(zipURL: URL) throws -> URL {
+        let fileManager = FileManager()
+        var destinationURL = try fileManager.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )
+
+        let fileName = zipURL.lastPathComponent + UUID().uuidString
+        destinationURL.appendPathComponent(fileName)
+        try fileManager.createDirectory(
+            at: destinationURL,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        try fileManager.unzipItem(at: zipURL, to: destinationURL)
+        
+        return destinationURL
+    }
+
+    /// Decode dictionary metadata from index.json and save in database
     private func processDictionaryMeta(_ indexURL: URL) async throws -> SDYomiDictionary {
         let data = try Data(contentsOf: indexURL)
         let metaData = try JSONDecoder().decode(LoadedDictionary.self, from: data)

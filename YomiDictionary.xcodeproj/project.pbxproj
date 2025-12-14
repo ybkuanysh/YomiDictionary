@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		91A43F2F2EE706C500E526FF /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 91A43F2E2EE706C500E526FF /* ZIPFoundation */; };
+		91889FFF2EEDD33C00369DEE /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 91889FFE2EEDD33C00369DEE /* ZIPFoundation */; };
 		91F73C6A2EE802EB006E89BC /* JsonStream in Frameworks */ = {isa = PBXBuildFile; productRef = 91F73C692EE802EB006E89BC /* JsonStream */; };
 /* End PBXBuildFile section */
 
@@ -29,7 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				91F73C6A2EE802EB006E89BC /* JsonStream in Frameworks */,
-				91A43F2F2EE706C500E526FF /* ZIPFoundation in Frameworks */,
+				91889FFF2EEDD33C00369DEE /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,8 +72,8 @@
 			);
 			name = YomiDictionary;
 			packageProductDependencies = (
-				91A43F2E2EE706C500E526FF /* ZIPFoundation */,
 				91F73C692EE802EB006E89BC /* JsonStream */,
+				91889FFE2EEDD33C00369DEE /* ZIPFoundation */,
 			);
 			productName = YomiDictionary;
 			productReference = 91791EB82EE6D8740064D5C0 /* YomiDictionary.app */;
@@ -104,8 +104,8 @@
 			mainGroup = 91791EAF2EE6D8740064D5C0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				91A43F2D2EE706C500E526FF /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				91F73C682EE802EB006E89BC /* XCRemoteSwiftPackageReference "json-stream" */,
+				91889FFD2EEDD33C00369DEE /* XCLocalSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 91791EB92EE6D8740064D5C0 /* Products */;
@@ -346,15 +346,14 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		91A43F2D2EE706C500E526FF /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.20;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		91889FFD2EEDD33C00369DEE /* XCLocalSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ZIPFoundation;
 		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
 		91F73C682EE802EB006E89BC /* XCRemoteSwiftPackageReference "json-stream" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Topolyte/json-stream.git";
@@ -366,9 +365,8 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		91A43F2E2EE706C500E526FF /* ZIPFoundation */ = {
+		91889FFE2EEDD33C00369DEE /* ZIPFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 91A43F2D2EE706C500E526FF /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
 		};
 		91F73C692EE802EB006E89BC /* JsonStream */ = {

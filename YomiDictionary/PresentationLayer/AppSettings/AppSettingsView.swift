@@ -15,31 +15,39 @@ struct AppSettingsView: View {
         NavigationStack {
             VStack {
                 List {
-                    HStack {
-                        Text("Dictionaries")
-                        Spacer()
-                        Button("Import") {
-                            viewModel.isFilePickerPresented = true
-                        }
-                    }
-                    if viewModel.importProgress != nil {
+                    Section {
                         HStack {
-                            ProgressView(value: viewModel.importProgress)
-                        }
-                    }
-                    ForEach(viewModel.dictionaries) { item in
-                        HStack {
-                            Text(item.title)
+                            Text("Import dictionary")
                             Spacer()
-                            VStack {
-                                Text(item.revision ?? "No revision")
-                                Text("\(item.wordsCount)")
+                            Button("Select") {
+                                viewModel.isFilePickerPresented = true
+                            }
+                        }
+                        if viewModel.importProgress != nil {
+                            VStack(alignment: .leading) {
+                                Text("Importing...")
+                                ProgressView(value: viewModel.importProgress)
+                            }
+                        }
+                    }
+                    Section {
+                        ForEach(viewModel.dictionaries) { item in
+                            HStack {
+                                Text(item.title)
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text(item.revision ?? "No revision")
+                                    Text("\(item.wordsCount)")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .font(.caption)
                             }
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
             }
-            .task { await viewModel.updateDictionaryList() }
+            .onAppear { viewModel.didAppear() }
             .navigationBarTitle("Settings")
             .fileImporter(
                 isPresented: $viewModel.isFilePickerPresented,
