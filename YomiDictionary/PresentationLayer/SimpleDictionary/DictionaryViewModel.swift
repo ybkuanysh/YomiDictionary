@@ -11,35 +11,24 @@ import SwiftData
 @Observable
 final class DictionaryViewModel {
     var isSettingsPresented: Bool = false
-//    let dataSource: YomiDictionariesDataSource
-    
-    var dictionaryRecords: [SDYomiWord] = []
     var searchText: String = ""
-    var searchResults: [SDYomiWord] {
-        if searchText.isEmpty {
-            return dictionaryRecords
+    var wordsList: [YomiWord] {
+        if fetchedWords.isEmpty {
+            []
         } else {
-            return dictionaryRecords.filter {
-                $0.reading.contains(searchText)
-                || $0.wordOriginal.contains(searchText)
-                || $0.definitions.contains(where: { definition in
-                    definition.localizedCaseInsensitiveContains(searchText.lowercased())
-                })
-            }
+            fetchedWords
         }
     }
+
+    var fetchedWords: [YomiWord] = []
     
     init() {
-//        let context = ModelContext(ContainerManager.shared.container)
-//        dataSource = YomiDictionariesDataSource(context: context)
     }
 
-    func parseDictionary() {
-//        do {
-//            dictionaryRecords = try dataSource.fetchWords()
-//            print("Successfully fetched \(dictionaryRecords.count) words.")
-//        } catch {
-//            fatalError(error.localizedDescription)
-//        }
+    func searchChanged(oldValue: String, newValue: String) {
+        Task {
+            let manager = await DictionaryManager()
+            fetchedWords = (try? await manager.fetchWords(contains: newValue)) ?? []
+        }
     }
 }

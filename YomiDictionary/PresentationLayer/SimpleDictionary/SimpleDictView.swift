@@ -12,7 +12,7 @@ struct SimpleDictView: View {
     var body: some View {
         NavigationStack {
             VStack {
-                if viewModel.searchResults.isEmpty {
+                if viewModel.wordsList.isEmpty {
                     VStack {
                         Image(systemName: "questionmark.folder.fill.ar")
                             .resizable()
@@ -23,7 +23,7 @@ struct SimpleDictView: View {
                     }
                     .foregroundStyle(Color(.systemGray3))
                 } else {
-                    List(viewModel.searchResults) { item in
+                    List(viewModel.wordsList) { item in
                         HStack {
                             VStack {
                                 Text(item.wordOriginal)
@@ -47,9 +47,7 @@ struct SimpleDictView: View {
                 }
             }
             .searchable(text: $viewModel.searchText)
-            .onAppear {
-                viewModel.parseDictionary()
-            }
+            .onChange(of: viewModel.searchText, viewModel.searchChanged)
             .navigationTitle("Dictionary")
         }
     }

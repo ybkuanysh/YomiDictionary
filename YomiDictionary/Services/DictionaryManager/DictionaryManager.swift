@@ -23,46 +23,58 @@ public final actor DictionaryManager {
 // MARK: - Save Dictionary Words to Database
 
 extension DictionaryManager {
+    
+    /// Run this func at application start to clear caches and remove empty dictionaries
     public func startDictionaryManager() async throws {
         try await DictionaryManager.clearCache()
         try await removeEmptyDictionaries()
     }
     
+    /// Fetch all dictionaries. Empty dictionaries will be ignored and removed at application restart.
     public func fetchDictionaries() async throws -> [YomiDictionary] {
         let fetchedDictionaries = try await dataStore.fetchData(predicate: #Predicate<SDYomiDictionary> {_ in true})
         return fetchedDictionaries.compactMap(YomiDictionary.init).filter { $0.wordsCount > 0 }
     }
-
+    
+    /// Save dictionary by URL
     public func saveDictionary(_ fileUrl: URL,
                                progress: @MainActor @escaping (Double) -> Void,
                                completion: @MainActor @escaping () async -> Void) async throws -> Void {
         
-            guard fileUrl.startAccessingSecurityScopedResource() else {
-                throw DictionaryErrors.basicError
-            }
-            defer { fileUrl.stopAccessingSecurityScopedResource() }
-
-            let dictionaryURL = try await DictionaryManager.extractToCache(zipURL: fileUrl)
-            
-            let savingProgress = try dictionaryAsyncStream(from: dictionaryURL)
-            
-            var lastResult: Double = 0
-            for try await status in savingProgress {
-                let status = await status.percentage
-                if status == lastResult { continue }
-                lastResult = status
-                await progress(status)
-            }
-            await completion()
+        guard fileUrl.startAccessingSecurityScopedResource() else {
+            throw DictionaryErrors.basicError
+        }
+        defer { fileUrl.stopAccessingSecurityScopedResource() }
+        
+        let dictionaryURL = try await DictionaryManager.extractToCache(zipURL: fileUrl)
+        
+        let savingProgress = try dictionaryAsyncStream(from: dictionaryURL)
+        
+        var lastResult: Double = 0
+        for try await status in savingProgress {
+            let status = await status.percentage
+            if status == lastResult { continue }
+            lastResult = status
+            await progress(status)
+        }
+        await completion()
     }
     
+    /// Delete dictionary and all connected words
     public func deleteDictionary(_ dictionary: YomiDictionary) async throws {
         let _ = try await removeWords(ofDictionaryWithId: dictionary.id)
         let dictId = dictionary.id
         let dictToRemovePredicate = #Predicate<SDYomiDictionary> { $0.id == dictId  }
         try await dataStore.remove(predicate: dictToRemovePredicate)
     }
-
+    
+    
+    /// Fetch all words which contains provided part
+    public func fetchWords(contains word: String) async throws -> [YomiWord] {
+        let predicate = #Predicate<SDYomiWord> { $0.reading.contains(word) || $0.wordOriginal.contains(word) }
+        let fetchedWords = try await dataStore.fetchData(predicate: predicate)
+        return fetchedWords.compactMap(YomiWord.init)
+    }
 }
 
 

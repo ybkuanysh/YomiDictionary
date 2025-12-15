@@ -42,7 +42,7 @@ public class SDYomiWord: Identifiable, Hashable {
 }
 
 /// Sendable data model.
-public struct YomiWord: Identifiable, Hashable {
+nonisolated public struct YomiWord: Identifiable, Hashable {
     public var id: UUID
     public var wordOriginal: String
     public var reading: String
@@ -61,6 +61,14 @@ public struct YomiWord: Identifiable, Hashable {
         self.reading = reading
         self.definitions = definitions
         self.dictionary = dictionary
+    }
+    
+    public init(_ word: SDYomiWord) {
+        self.id = word.id
+        self.wordOriginal = word.wordOriginal
+        self.reading = word.reading
+        self.definitions = word.definitions
+        self.dictionary = word.dictionary
     }
 }
 
