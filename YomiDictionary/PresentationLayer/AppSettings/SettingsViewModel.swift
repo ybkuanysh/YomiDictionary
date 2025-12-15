@@ -31,7 +31,20 @@ final class SettingsViewModel {
     func loadDictionaryList() {
         Task {
             let dictionaryManager = await DictionaryManager()
-            dictionaries = await dictionaryManager.fetchDictionaries()
+            let fetchedDictionaries = try? await dictionaryManager.fetchDictionaries()
+            dictionaries = fetchedDictionaries ?? []
+        }
+    }
+    
+    func onDictDelete(_ indexSet: IndexSet) -> Void {
+        Task {
+            for index in indexSet {
+                let dictionary = dictionaries[index]
+                print("Trying to delete: \(dictionary.title)")
+                let dictionaryManager = await DictionaryManager()
+                try? await dictionaryManager.deleteDictionary(dictionary)
+                print("Successfully deleted: \(dictionary.title)")
+            }
         }
     }
     

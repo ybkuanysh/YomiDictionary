@@ -23,9 +23,14 @@ public final actor DictionaryManager {
 // MARK: - Save Dictionary Words to Database
 
 extension DictionaryManager {
-    public func fetchDictionaries() async -> [YomiDictionary] {
-        let dictionaries = try? await dataStore.fetchData(predicate: #Predicate<SDYomiDictionary> {_ in true})
-        return dictionaries?.map(YomiDictionary.init) ?? []
+    public func startDictionaryManager() async throws {
+        try await DictionaryManager.clearCache()
+        try await removeEmptyDictionaries()
+    }
+    
+    public func fetchDictionaries() async throws -> [YomiDictionary] {
+        let fetchedDictionaries = try await dataStore.fetchData(predicate: #Predicate<SDYomiDictionary> {_ in true})
+        return fetchedDictionaries.compactMap(YomiDictionary.init).filter { $0.wordsCount > 0 }
     }
 
     public func saveDictionary(_ fileUrl: URL,
@@ -50,6 +55,13 @@ extension DictionaryManager {
             }
             await completion()
     }
+    
+    public func deleteDictionary(_ dictionary: YomiDictionary) async throws {
+        let _ = try await removeWords(ofDictionaryWithId: dictionary.id)
+        let dictId = dictionary.id
+        let dictToRemovePredicate = #Predicate<SDYomiDictionary> { $0.id == dictId  }
+        try await dataStore.remove(predicate: dictToRemovePredicate)
+    }
 
 }
 
@@ -58,6 +70,33 @@ extension DictionaryManager {
 
 extension DictionaryManager {
     
+    private func removeWords(ofDictionaryWithId dictId: UUID) async throws -> Int {
+        let wordsOfDictPredicate = #Predicate<SDYomiWord> { $0.dictionary.id == dictId }
+        let wordsRemovedTotal = try await dataStore.fetchCount(predicate: wordsOfDictPredicate)
+        try await dataStore.remove(predicate: wordsOfDictPredicate)
+        return wordsRemovedTotal
+    }
+    
+    private func removeEmptyDictionaries() async throws {
+        let allWordsPredicate = #Predicate<SDYomiWord> { _ in true }
+        let allWordsCount = try await dataStore.fetchCount(predicate: allWordsPredicate)
+        print("All words count: \(allWordsCount)")
+        
+        // Find dictionaries that are empty
+        let emptyDictsPredicate = #Predicate<SDYomiDictionary> { $0.wordsCount == 0 }
+        let emptyDictionaries = try await dataStore.fetchData(predicate: emptyDictsPredicate)
+        print("Found empty dictionaries: \(emptyDictionaries.map {$0.title})")
+        
+        for dict in emptyDictionaries {
+            let wordsRemovedTotal = try await removeWords(ofDictionaryWithId: dict.id)
+            print("Removed \(wordsRemovedTotal) words from \(dict.title) dictionary")
+        }
+        
+        // Remove the empty dictionaries themselves
+        try await dataStore.remove(predicate: emptyDictsPredicate)
+        print("Removed \(emptyDictionaries.count) empty dictionaries")
+    }
+
     private func dictionaryAsyncStream(from dictionaryFolder: URL) throws -> AsyncThrowingStream
                                                                              <DictionaryProgress, Error> {
                                                                                  
@@ -80,9 +119,6 @@ extension DictionaryManager {
                     
                     let countOfWords = try await countWords(in: files)
                     
-                    // Saving count of words in database to dictionary
-                    try await updateDictionary(currentDictionary.id, with: countOfWords)
-                    
                     let progress = DictionaryProgress(allWordsCount: countOfWords)
                     
                     try await withThrowingTaskGroup(of: Void.self) { group in
@@ -96,6 +132,10 @@ extension DictionaryManager {
                         }
                         
                         for try await _ in group {}
+                        
+                        // Saving count of words in database to dictionary
+                        try await updateDictionary(currentDictionary.id, with: progress.wordsSaved)
+                        
                         continuation.finish()
                     }
                 } catch { continuation.finish(throwing: error) }
@@ -111,7 +151,7 @@ extension DictionaryManager {
     }
 
     private func saveDictionaryPart(from file: URL,
-                                    in dictionary: SDYomiDictionary?,
+                                    in dictionary: SDYomiDictionary,
                                     handler: (Int) async -> Void) async throws {
         var counter: Int = 0
 
@@ -239,6 +279,29 @@ extension DictionaryManager {
         
         return destinationURL
     }
+    
+    @MainActor
+    private static func clearCache() throws {
+        let fileManager = FileManager.default
+        let cacheDirectoryURL = try fileManager.url(
+            for: .cachesDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        )
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: cacheDirectoryURL,
+            includingPropertiesForKeys: nil
+        )
+        if fileURLs.isEmpty {
+            print("No items to remove from cache")
+            return
+        }
+        try fileURLs.forEach(fileManager.removeItem(at:))
+        print(
+            "Successfully removed \(fileURLs.count) items from cache"
+        )
+    }
 
     /// Decode dictionary metadata from index.json and save in database
     private func processDictionaryMeta(_ indexURL: URL) async throws -> SDYomiDictionary {
@@ -257,3 +320,4 @@ extension DictionaryManager {
         return dictionary
     }
 }
+

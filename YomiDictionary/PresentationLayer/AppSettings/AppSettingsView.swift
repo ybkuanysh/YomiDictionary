@@ -45,6 +45,7 @@ struct AppSettingsView: View {
                                 .font(.caption)
                             }
                         }
+                        .onDelete(perform: viewModel.onDictDelete)
                     }
                 }
                 .listStyle(.insetGrouped)

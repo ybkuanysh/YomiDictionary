@@ -13,30 +13,10 @@ struct YomiDictionaryApp: App {
         WindowGroup {
             MainContainerView()
                 .onAppear {
-                    do {
-                        let fileManager = FileManager.default
-                        let cacheDirectoryURL = try fileManager.url(
-                            for: .cachesDirectory,
-                            in: .userDomainMask,
-                            appropriateFor: nil,
-                            create: false
-                        )
-                        let fileURLs = try fileManager.contentsOfDirectory(
-                            at: cacheDirectoryURL,
-                            includingPropertiesForKeys: nil
-                        )
-                        if fileURLs.isEmpty {
-                            print("No items to remove from cache")
-                            return
-                        }
-                        try fileURLs.forEach(fileManager.removeItem(at:))
-                        print(
-                            "Successfully removed \(fileURLs.count) items from cache"
-                        )
-                    } catch {
-                        fatalError(
-                            "Failed to remove items from cache: \(error)"
-                        )
+                    Task {
+                        do {
+                            try await DictionaryManager().startDictionaryManager()
+                        } catch { fatalError("Error at dictionary manager start: \(error)") }
                     }
                 }
         }

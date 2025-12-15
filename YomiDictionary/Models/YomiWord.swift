@@ -16,13 +16,13 @@ public class SDYomiWord: Identifiable, Hashable {
     public var wordOriginal: String
     public var reading: String
     public var definitions: [String]
-    public var dictionary: SDYomiDictionary?
+    public var dictionary: SDYomiDictionary
 
     public init(
         wordOriginal: String,
         reading: String,
         definitions: [String],
-        dictionary: SDYomiDictionary? = nil
+        dictionary: SDYomiDictionary
     ) {
         self.wordOriginal = wordOriginal
         self.reading = reading
@@ -32,7 +32,7 @@ public class SDYomiWord: Identifiable, Hashable {
     
     public init(
         _ entry: DictionaryEntry,
-        dictionary: SDYomiDictionary? = nil
+        dictionary: SDYomiDictionary
     ) {
         self.wordOriginal = entry.kanji
         self.reading = entry.reading
@@ -47,14 +47,14 @@ public struct YomiWord: Identifiable, Hashable {
     public var wordOriginal: String
     public var reading: String
     public var definitions: [String]
-    public var dictionary: SDYomiDictionary?
+    public var dictionary: SDYomiDictionary
 
     public init(
         id: UUID,
         wordOriginal: String,
         reading: String,
         definitions: [String],
-        dictionary: SDYomiDictionary? = nil
+        dictionary: SDYomiDictionary
     ) {
         self.id = id
         self.wordOriginal = wordOriginal
